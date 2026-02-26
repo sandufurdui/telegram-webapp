@@ -11,55 +11,43 @@
          background: var(--tg-theme-bg-color, #fff);
          color: var(--tg-theme-text-color, #333); }
   .card { max-width: 480px; margin: 0 auto; text-align: center; }
-  h2 { margin-bottom: 20px; font-size: 20px; }
-  .status { margin: 12px 0; font-size: 15px; line-height: 1.6; }
+  .status { margin: 16px 0; font-size: 16px; line-height: 1.6; }
+  .spinner { display: inline-block; width: 36px; height: 36px;
+             border: 3px solid var(--tg-theme-hint-color, #ddd);
+             border-top: 3px solid var(--tg-theme-button-color, #2481cc);
+             border-radius: 50%; animation: spin .8s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg) } }
   .icon { font-size: 48px; margin-bottom: 12px; }
+  .preview { background: var(--tg-theme-secondary-bg-color, #f0f0f0);
+             border-radius: 10px; padding: 14px; margin: 16px 0;
+             font-size: 14px; text-align: left; line-height: 1.6; }
   .btn { display: block; width: 100%; padding: 14px; font-size: 16px;
-         font-weight: 600; border: none; border-radius: 10px;
-         cursor: pointer; margin: 10px 0;
-         background: var(--tg-theme-button-color, #2481cc);
+         font-weight: 600; border: none; border-radius: 10px; cursor: pointer;
+         margin: 10px 0; background: var(--tg-theme-button-color, #2481cc);
          color: var(--tg-theme-button-text-color, #fff); }
-  .btn:active { opacity: 0.8; }
-  .btn-secondary { background: var(--tg-theme-secondary-bg-color, #e0e0e0);
-                   color: var(--tg-theme-text-color, #333); }
-  .steps { text-align: left; margin: 16px 0; font-size: 14px; line-height: 2; }
-  .steps strong { color: var(--tg-theme-link-color, #2481cc); }
-  textarea { width: 100%; height: 120px; border-radius: 10px; padding: 12px;
-             font-size: 14px; border: 2px solid var(--tg-theme-hint-color, #ccc);
-             background: var(--tg-theme-secondary-bg-color, #f5f5f5);
-             color: var(--tg-theme-text-color, #333); resize: vertical; }
   .hidden { display: none; }
 </style>
 </head>
 <body>
 <div class="card">
-  <h2>🧾 Preluare bon fiscal</h2>
-
-  <!-- Step 1: Open receipt page -->
-  <div id="step1">
-    <p class="status">Bonul trebuie deschis din telefonul tău pentru a ocoli protecția site-ului.</p>
-    <div class="steps">
-      1. Apasă <strong>Deschide bonul</strong><br>
-      2. Pe pagina bonului: ține apăsat → <strong>Select All</strong> → <strong>Copy</strong><br>
-      3. Revino aici și apasă <strong>Lipește datele</strong>
-    </div>
-    <button class="btn" id="openBtn" onclick="openReceipt()">🧾 Deschide bonul</button>
-    <button class="btn btn-secondary" onclick="Telegram.WebApp.close()">❌ Anulează</button>
+  <div id="loading">
+    <div class="spinner"></div>
+    <p class="status">Se preia bonul fiscal...</p>
+    <p class="status" style="font-size:13px; opacity:.6;" id="substatus">Conectare la server...</p>
   </div>
 
-  <!-- Step 2: Paste content -->
-  <div id="step2" class="hidden">
-    <p class="status">📋 Acum lipește textul copiat:</p>
-    <textarea id="pasteArea" placeholder="Ține apăsat aici → Paste / Lipește"></textarea>
-    <button class="btn" onclick="sendData()">📤 Trimite datele</button>
-    <button class="btn btn-secondary" onclick="show('step1')">⬅️ Înapoi</button>
-  </div>
-
-  <!-- Step 3: Done -->
-  <div id="step3" class="hidden">
+  <div id="success" class="hidden">
     <div class="icon">✅</div>
-    <p class="status"><strong>Datele au fost trimise!</strong></p>
+    <p class="status"><strong>Bon preluat!</strong></p>
+    <div class="preview" id="preview"></div>
     <p class="status" style="font-size:14px;">Se închide automat...</p>
+  </div>
+
+  <div id="error" class="hidden">
+    <div class="icon">❌</div>
+    <p class="status"><strong>Eroare</strong></p>
+    <p class="status" id="errorMsg" style="font-size:14px; opacity:.7;"></p>
+    <button class="btn" onclick="start()">🔄 Reîncearcă</button>
   </div>
 </div>
 
@@ -69,31 +57,66 @@ tg.ready();
 tg.expand();
 
 const params = new URLSearchParams(window.location.search);
-const url = params.get('url');
+const receiptUrl = params.get('url');
+const serverBase = params.get('server');
 
-function openReceipt() {
-  if (url) {
-    window.open(url, '_blank');
-  }
-  // Show paste step after short delay
-  setTimeout(() => show('step2'), 500);
-}
-
-function sendData() {
-  const text = document.getElementById('pasteArea').value.trim();
-  if (!text || text.length < 30) {
-    alert('Textul este prea scurt. Asigură-te că ai copiat tot conținutul paginii.');
+function start() {
+  if (!receiptUrl || !serverBase) {
+    showError('Parametri lipsă.');
     return;
   }
-  tg.sendData(JSON.stringify({ text: text, url: url || '' }));
-  show('step3');
-  setTimeout(() => tg.close(), 1500);
+  show('loading');
+  fetchReceipt();
+}
+
+async function fetchReceipt() {
+  try {
+    setSubstatus('Se preia bonul...');
+
+    const proxyUrl = serverBase + '/proxy_receipt?url=' + encodeURIComponent(receiptUrl);
+    const resp = await fetch(proxyUrl);
+    const data = await resp.json();
+
+    if (data.success && data.receipt) {
+      const r = data.receipt;
+      let preview = '';
+      if (r.retailer) preview += '🏪 ' + r.retailer + '\n';
+      if (r.date) preview += '📅 ' + r.date + '\n';
+      if (r.total) preview += '💰 Total: ' + r.total.toFixed(2) + ' MDL\n';
+      if (r.items) preview += '📦 ' + r.items.length + ' articole';
+      document.getElementById('preview').textContent = preview || 'Date preluate';
+
+      show('success');
+
+      // Send receipt JSON back to bot
+      tg.sendData(JSON.stringify({ receipt: r, url: receiptUrl }));
+      setTimeout(() => tg.close(), 2000);
+
+    } else {
+      showError(data.error === 'parse_failed'
+        ? 'Pagina a fost preluată dar parsarea a eșuat.'
+        : 'Nu s-a putut prelua bonul: ' + (data.error || 'eroare necunoscută'));
+    }
+  } catch (e) {
+    showError('Eroare de conexiune: ' + e.message);
+  }
+}
+
+function setSubstatus(text) {
+  document.getElementById('substatus').textContent = text;
 }
 
 function show(id) {
-  ['step1', 'step2', 'step3'].forEach(s =>
+  ['loading', 'success', 'error'].forEach(s =>
     document.getElementById(s).classList.toggle('hidden', s !== id));
 }
+
+function showError(msg) {
+  document.getElementById('errorMsg').textContent = msg;
+  show('error');
+}
+
+start();
 </script>
 </body>
 </html>
