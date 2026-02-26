@@ -5,20 +5,24 @@
 <title>Test Receipt Fetch</title>
 </head>
 <body>
-<h2>Check console (F12)</h2>
+<h2>Receipt Fetcher</h2>
+<pre id="output">Loading...</pre>
 <script>
-fetch("https://mev.sfs.md/receipt-verifier/8C51F9509228A90E99FD193BDFD7AFBD")
+const target = "https://mev.sfs.md/receipt-verifier/8C51F9509228A90E99FD193BDFD7AFBD";
+const proxy = "https://corsproxy.io/?" + encodeURIComponent(target);
+
+fetch(proxy)
   .then(resp => {
     console.log("Status:", resp.status);
-    console.log("Headers:", Object.fromEntries(resp.headers.entries()));
     return resp.text();
   })
   .then(html => {
     console.log("Response length:", html.length);
-    console.log("Full response:", html);
+    document.getElementById("output").textContent = html;
   })
   .catch(err => {
     console.error("Fetch error:", err);
+    document.getElementById("output").textContent = "Error: " + err.message;
   });
 </script>
 </body>
