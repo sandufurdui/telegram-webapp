@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html>
 <head>
@@ -8,22 +9,27 @@
 <h2>Receipt Fetcher</h2>
 <pre id="output">Loading...</pre>
 <script>
-const target = "https://mev.sfs.md/receipt-verifier/8C51F9509228A90E99FD193BDFD7AFBD";
-const proxy = "https://corsproxy.io/?" + encodeURIComponent(target);
+const params = new URLSearchParams(window.location.search);
+const target = params.get("url");
 
-fetch(proxy)
-  .then(resp => {
-    console.log("Status:", resp.status);
-    return resp.text();
-  })
-  .then(html => {
-    console.log("Response length:", html.length);
-    document.getElementById("output").textContent = html;
-  })
-  .catch(err => {
-    console.error("Fetch error:", err);
-    document.getElementById("output").textContent = "Error: " + err.message;
-  });
+if (!target) {
+  document.getElementById("output").textContent = "Error: No ?url= parameter provided.";
+} else {
+  const proxy = "https://corsproxy.io/?" + encodeURIComponent(target);
+  fetch(proxy)
+    .then(resp => {
+      console.log("Status:", resp.status);
+      return resp.text();
+    })
+    .then(html => {
+      console.log("Response length:", html.length);
+      document.getElementById("output").textContent = html;
+    })
+    .catch(err => {
+      console.error("Fetch error:", err);
+      document.getElementById("output").textContent = "Error: " + err.message;
+    });
+}
 </script>
 </body>
 </html>
