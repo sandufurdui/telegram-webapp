@@ -1,122 +1,25 @@
 <!DOCTYPE html>
-<html lang="ro">
+<html>
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Preia bon fiscal</title>
-<script src="https://telegram.org/js/telegram-web-app.js"></script>
-<style>
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: -apple-system, system-ui, sans-serif; padding: 20px;
-         background: var(--tg-theme-bg-color, #fff);
-         color: var(--tg-theme-text-color, #333); }
-  .card { max-width: 480px; margin: 0 auto; text-align: center; }
-  .status { margin: 16px 0; font-size: 16px; line-height: 1.6; }
-  .spinner { display: inline-block; width: 36px; height: 36px;
-             border: 3px solid var(--tg-theme-hint-color, #ddd);
-             border-top: 3px solid var(--tg-theme-button-color, #2481cc);
-             border-radius: 50%; animation: spin .8s linear infinite; }
-  @keyframes spin { to { transform: rotate(360deg) } }
-  .icon { font-size: 48px; margin-bottom: 12px; }
-  .preview { background: var(--tg-theme-secondary-bg-color, #f0f0f0);
-             border-radius: 10px; padding: 14px; margin: 16px 0;
-             font-size: 14px; text-align: left; line-height: 1.6; }
-  .btn { display: block; width: 100%; padding: 14px; font-size: 16px;
-         font-weight: 600; border: none; border-radius: 10px; cursor: pointer;
-         margin: 10px 0; background: var(--tg-theme-button-color, #2481cc);
-         color: var(--tg-theme-button-text-color, #fff); }
-  .hidden { display: none; }
-</style>
+<title>Test Receipt Fetch</title>
 </head>
 <body>
-<div class="card">
-  <div id="loading">
-    <div class="spinner"></div>
-    <p class="status">Se preia bonul fiscal...</p>
-    <p class="status" style="font-size:13px; opacity:.6;" id="substatus">Conectare la server...</p>
-  </div>
-
-  <div id="success" class="hidden">
-    <div class="icon">✅</div>
-    <p class="status"><strong>Bon preluat!</strong></p>
-    <div class="preview" id="preview"></div>
-    <p class="status" style="font-size:14px;">Se închide automat...</p>
-  </div>
-
-  <div id="error" class="hidden">
-    <div class="icon">❌</div>
-    <p class="status"><strong>Eroare</strong></p>
-    <p class="status" id="errorMsg" style="font-size:14px; opacity:.7;"></p>
-    <button class="btn" onclick="start()">🔄 Reîncearcă</button>
-  </div>
-</div>
-
+<h2>Check console (F12)</h2>
 <script>
-const tg = window.Telegram.WebApp;
-tg.ready();
-tg.expand();
-
-const params = new URLSearchParams(window.location.search);
-const receiptUrl = params.get('url');
-const serverBase = params.get('server');
-
-function start() {
-  if (!receiptUrl || !serverBase) {
-    showError('Parametri lipsă.');
-    return;
-  }
-  show('loading');
-  fetchReceipt();
-}
-
-async function fetchReceipt() {
-  try {
-    setSubstatus('Se preia bonul...');
-
-    const proxyUrl = serverBase + '/proxy_receipt?url=' + encodeURIComponent(receiptUrl);
-    const resp = await fetch(proxyUrl);
-    const data = await resp.json();
-
-    if (data.success && data.receipt) {
-      const r = data.receipt;
-      let preview = '';
-      if (r.retailer) preview += '🏪 ' + r.retailer + '\n';
-      if (r.date) preview += '📅 ' + r.date + '\n';
-      if (r.total) preview += '💰 Total: ' + r.total.toFixed(2) + ' MDL\n';
-      if (r.items) preview += '📦 ' + r.items.length + ' articole';
-      document.getElementById('preview').textContent = preview || 'Date preluate';
-
-      show('success');
-
-      // Send receipt JSON back to bot
-      tg.sendData(JSON.stringify({ receipt: r, url: receiptUrl }));
-      setTimeout(() => tg.close(), 2000);
-
-    } else {
-      showError(data.error === 'parse_failed'
-        ? 'Pagina a fost preluată dar parsarea a eșuat.'
-        : 'Nu s-a putut prelua bonul: ' + (data.error || 'eroare necunoscută'));
-    }
-  } catch (e) {
-    showError('Eroare de conexiune: ' + e.message);
-  }
-}
-
-function setSubstatus(text) {
-  document.getElementById('substatus').textContent = text;
-}
-
-function show(id) {
-  ['loading', 'success', 'error'].forEach(s =>
-    document.getElementById(s).classList.toggle('hidden', s !== id));
-}
-
-function showError(msg) {
-  document.getElementById('errorMsg').textContent = msg;
-  show('error');
-}
-
-start();
+fetch("https://mev.sfs.md/receipt-verifier/8C51F9509228A90E99FD193BDFD7AFBD")
+  .then(resp => {
+    console.log("Status:", resp.status);
+    console.log("Headers:", Object.fromEntries(resp.headers.entries()));
+    return resp.text();
+  })
+  .then(html => {
+    console.log("Response length:", html.length);
+    console.log("Full response:", html);
+  })
+  .catch(err => {
+    console.error("Fetch error:", err);
+  });
 </script>
 </body>
 </html>
