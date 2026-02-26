@@ -1,32 +1,30 @@
-
 <!DOCTYPE html>
 <html>
-<head>
-<meta charset="utf-8">
-<title>Test Receipt Fetch</title>
-</head>
+<head><meta charset="utf-8"><title>Proxy</title></head>
 <body>
-<h2>Receipt Fetcher</h2>
 <pre id="output">Loading...</pre>
 <script>
 const params = new URLSearchParams(window.location.search);
 const target = params.get("url");
+const raw = params.get("raw"); // server-side callers add ?raw=1
 
 if (!target) {
   document.getElementById("output").textContent = "Error: No ?url= parameter provided.";
 } else {
   const proxy = "https://corsproxy.io/?" + encodeURIComponent(target);
   fetch(proxy)
-    .then(resp => {
-      console.log("Status:", resp.status);
-      return resp.text();
-    })
+    .then(resp => resp.text())
     .then(html => {
-      console.log("Response length:", html.length);
-      document.getElementById("output").textContent = html;
+      if (raw === "1") {
+        // Replace the entire page with raw HTML for server-side consumers
+        document.open();
+        document.write(html);
+        document.close();
+      } else {
+        document.getElementById("output").textContent = html;
+      }
     })
     .catch(err => {
-      console.error("Fetch error:", err);
       document.getElementById("output").textContent = "Error: " + err.message;
     });
 }
