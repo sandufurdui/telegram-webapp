@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Preia bon fiscal</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, system-ui, sans-serif; padding: 20px;
+         background: var(--tg-theme-bg-color, #fff);
+         color: var(--tg-theme-text-color, #333); }
+  .card { max-width: 480px; margin: 0 auto; text-align: center; }
+  h2 { margin-bottom: 20px; font-size: 20px; }
+  .status { margin: 16px 0; font-size: 16px; line-height: 1.5; }
+  .spinner { display: inline-block; width: 36px; height: 36px;
+             border: 3px solid var(--tg-theme-hint-color, #ddd);
+             border-top: 3px solid var(--tg-theme-button-color, #2481cc);
+             border-radius: 50%; animation: spin .8s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg) } }
+  .preview { background: var(--tg-theme-secondary-bg-color, #f0f0f0);
+             border-radius: 10px; padding: 14px; margin: 16px 0;
+             font-size: 14px; text-align: left; line-height: 1.6; }
+  .icon { font-size: 48px; margin-bottom: 12px; }
+  .btn { display: block; width: 100%; padding: 14px; font-size: 16px;
+         font-weight: 600; border: none; border-radius: 10px;
+         cursor: pointer; margin: 10px 0;
+         background: var(--tg-theme-button-color, #2481cc);
+         color: var(--tg-theme-button-text-color, #fff); }
+  .hidden { display: none; }
+</style>
+</head>
+<body>
+<div class="card">
+  <h2>🧾 Preluare bon fiscal</h2>
+
+  <div id="loading">
+    <div class="spinner"></div>
+    <p class="status">Se preia pagina bonului...</p>
+  </div>
+
+  <div id="success" class="hidden">
+    <div class="icon">✅</div>
+    <p class="status"><strong>Bon preluat cu succes!</strong></p>
+    <div class="preview" id="preview"></div>
+    <p class="status" style="font-size:14px;">Se trimit datele către bot...</p>
+  </div>
+
+  <div id="error" class="hidden">
+    <div class="icon">❌</div>
+    <p class="status"><strong>Eroare la preluarea bonului</strong></p>
+    <p class="status" id="errorMsg" style="font-size:14px; opacity:.7;"></p>
+    <button class="btn" onclick="location.reload()">🔄 Încearcă din nou</button>
+  </div>
+</div>
+
+<script>
+const tg = window.Telegram.WebApp;
+tg.ready();
+tg.expand();
+
+const params = new URLSearchParams(window.location.search);
+const url = params.get('url');
+
+if (!url) {
+  showError('Lipsește URL-ul bonului.');
+} else {
+  fetchAndSend(url);
+}
+
+async function fetchAndSend(targetUrl) {
+  try {
+    const resp = await fetch(targetUrl);
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    const html = await resp.text();
+
+    // Show preview
+    let preview = '';
+    const rm = html.match(/<[^>]*font-monospace[^>]*>([\s\S]*?)<\//);
+    const tm = html.match(/TOTAL[\s\S]{0,100}?([\d]+[.,]\d{2})/i);
+    if (rm) {
+      const name = rm[1].replace(/<[^>]*>/g, '').trim().split('\n')[0];
+      if (name) preview += '🏪 ' + name + '\n';
+    }
+    if (tm) preview += '💰 Total: ' + tm[1] + ' MDL';
+    document.getElementById('preview').textContent = preview || 'Date preluate';
+
+    show('success');
+
+    // Send data back to bot
+    tg.sendData(JSON.stringify({ html: html, url: targetUrl }));
+
+    // Close after short delay
+    setTimeout(() => tg.close(), 1500);
+
+  } catch (e) {
+    showError(e.message);
+  }
+}
+
+function show(id) {
+  ['loading', 'success', 'error'].forEach(s =>
+    document.getElementById(s).classList.toggle('hidden', s !== id));
+}
+
+function showError(msg) {
+  document.getElementById('errorMsg').textContent = msg;
+  show('error');
+}
+</script>
+</body>
+</html> 
